@@ -1,0 +1,27 @@
+# Scan results - personal, never committed
+output/
+
+# Machine-specific / produced by install.py (venv, downloaded binaries)
+venv/
+bin/
+install.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Personal target lists
+*.tmp
+targets.txt
+
+# Local customization (config.example.json is the tracked template)
+config.json

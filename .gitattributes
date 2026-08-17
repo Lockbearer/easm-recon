@@ -1,0 +1,10 @@
+# Normalize line endings so the repo is consistent across Windows/Linux/macOS.
+# Text files are stored as LF in the repository regardless of local checkout.
+* text=auto eol=lf
+
+# Shell scripts must stay LF or they break on Linux/macOS (bash: bad interpreter).
+*.sh   text eol=lf
+*.py   text eol=lf
+
+# Windows batch files need CRLF.
+*.bat  text eol=crlf

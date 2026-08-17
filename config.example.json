@@ -1,0 +1,19 @@
+{
+  "_comment": "Copy to config.json to customize without touching code. 'flags' overrides a tool's default flags; 'profiles' adds named presets usable via --profile <name>. Only tunable flags belong here — I/O flags (target, -json, -o) are added automatically. config.json is git-ignored; this template is tracked.",
+
+  "flags": {
+    "nuclei": ["-severity", "medium,high,critical", "-no-color", "-timeout", "10",
+               "-retries", "1", "-stats", "-si", "15"]
+  },
+
+  "profiles": {
+    "web": {
+      "nmap": ["-Pn", "-T4", "--host-timeout", "5m", "-sV", "-p", "80,443,8080,8443"],
+      "nuclei": ["-severity", "low,medium,high,critical", "-no-color", "-timeout", "10",
+                 "-retries", "1", "-stats", "-si", "15", "-tags", "exposure,misconfig,cve"]
+    },
+    "allports": {
+      "nmap": ["-Pn", "-T4", "--host-timeout", "15m", "--version-light", "-p-"]
+    }
+  }
+}

@@ -1,0 +1,3 @@
+# Installed into the isolated venv by install.py.
+# wafw00f pulls its own deps (requests, etc.).
+wafw00f>=2.4.0
