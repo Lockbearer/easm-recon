@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -91,8 +92,12 @@ def run_streamed(cmd, timeout, log_path, progress=None, interval=5, progress_eve
     exceeds `timeout`. Returns True if it finished on its own, False if killed.
     """
     with open(log_path, "wb") as fh:
+        # Put the child in its own process group / session so a timeout can kill
+        # the whole tree (the tool plus anything it spawns), not just the parent.
+        group_kw = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+                    if IS_WINDOWS else {"start_new_session": True})
         try:
-            p = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT)
+            p = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, **group_kw)
         except (FileNotFoundError, OSError) as e:
             # Record why it could not launch (e.g. blocked by AV / Windows
             # security policy) so the report never mistakes this for a result.
@@ -114,8 +119,22 @@ def run_streamed(cmd, timeout, log_path, progress=None, interval=5, progress_eve
 
 
 def _kill(p):
+    """Terminate the child and every process it spawned (the whole tree)."""
     try:
-        p.kill()
+        if IS_WINDOWS:
+            # taskkill /T walks and kills the entire process tree; /F forces it.
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            # The child leads its own process group (start_new_session=True),
+            # so signalling the group reaches its descendants too.
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+    except (OSError, ProcessLookupError):
+        try:
+            p.kill()  # fall back to killing just the parent
+        except Exception:
+            pass
+    try:
         p.wait(timeout=10)
     except Exception:
         pass

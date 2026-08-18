@@ -12,7 +12,7 @@ results without wiring eight tools together by hand.
 - **Orchestrates:** dnsx, httpx, wafw00f, tlsx, cdncheck, nmap, nuclei, subfinder
 - **Runs on:** Windows, Linux and macOS (pure-Python orchestrator, no shell glue)
 - **Two modes:** single host, or a parallel batch from a list file
-- **Passive by default:** active/noisy stages (ports, nuclei) are strictly opt-in
+- **Light by default (active, but low-volume):** only DNS + cdncheck are truly passive; httpx/tlsx/wafw00f touch the target but send little. The *noisy* stages (ports, nuclei) are strictly opt-in — and `--dry-run` estimates the footprint first.
 - **Customizable:** per-tool flags, presets, and a config file (see [Customization](#customization))
 
 > **Scope.** This is a **reconnaissance and automated-scanning** tool (EASM). It
@@ -56,14 +56,25 @@ brew install nmap
 ## Quick start
 
 ```bash
-python -m easm example.com                          # single host, passive
+python -m easm example.com                          # single host, light (see note below)
+python -m easm example.com --dry-run                # estimate traffic, scan nothing
 python -m easm example.com --full                   # + ports + nuclei + subdomains
 python -m easm targets.txt --full --concurrency 6   # batch, 6 hosts in parallel
 ```
 
 The target is treated as a **list file** if a file by that name exists on disk,
-otherwise as a single host. With no flags the run is **passive/light**: DNS,
-cdncheck, httpx and TLS fingerprinting plus WAF detection only.
+otherwise as a single host.
+
+**What "light" means (important).** *Active* (touches the target) and *noisy*
+(high volume) are two different axes. With no flags the run is **active but
+low-volume**:
+
+- **Passive** — only **dnsx** (DNS to a resolver) and **cdncheck** (IP-range lookup) never touch the target.
+- **Active, low-volume** — **httpx** and **tlsx** make a handful of real HTTP/TLS requests; **WAF detection** (wafw00f, or the built-in behavioural fallback) sends a **small battery of attack-pattern probes** (SQLi/XSS test payloads) to see what gets blocked. It's a bounded set of requests — not a flood — but it *is* traffic to the target and can appear in a WAF/IPS log.
+- **Noisy** — only the opt-in **`--ports`** (especially `-p-`) and **`--nuclei`** generate heavy traffic (thousands of requests / tens of thousands of packets).
+
+Run `--dry-run` to see the estimated footprint before you scan, and only test
+hosts you are authorized to.
 
 Optional launcher, so you can type `easm <host>` from anywhere:
 
@@ -83,6 +94,7 @@ easm example.com --full
 | `--nuclei` | off | both | nuclei vulnerability/exposure scan. **Active** |
 | `--subs` | off | both | subdomain discovery (subfinder) |
 | `--full` | off | both | shorthand for `--ports --nuclei --subs` |
+| `--dry-run` | off | both | print an estimate of the network footprint (requests/packets) and exit — **sends nothing** |
 | `--concurrency N` | 4 | batch | number of hosts scanned in parallel |
 | `--nuclei-timeout N` | 900 | both | nuclei wall-clock cap in seconds; if hit, results are flagged **partial** |
 | `--profile NAME` | `default` | both | flag preset: `default` / `fast` / `deep` (see [Customization](#customization)) |

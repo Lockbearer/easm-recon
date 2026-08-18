@@ -1,9 +1,12 @@
 """Command-line interface.
 
-  easm <host>            single-host scan (passive by default)
+  easm <host>            single-host scan (light by default; see note)
   easm <list.txt>        batch scan (parallel) — argument is auto-detected as a file
   easm <target> --full   add ports + nuclei + subdomains
+  easm <target> --dry-run  estimate the network footprint without scanning
 
+The no-flag run is LIGHT but not fully passive: only DNS + cdncheck avoid the
+target; httpx/tlsx make real requests and WAF detection sends attack-like probes.
 The target is treated as a LIST FILE if it exists on disk, otherwise as a host.
 """
 from __future__ import annotations
@@ -15,7 +18,7 @@ import shlex
 import sys
 from datetime import datetime
 
-from . import __version__, batch, config, engine, tools
+from . import __version__, batch, config, engine, estimate, tools
 
 # Tools whose flags can be extended from the CLI via --<tool>-args "...".
 CUSTOMIZABLE = ["dnsx", "httpx", "tlsx", "cdncheck", "nmap", "naabu", "nuclei", "subfinder"]
@@ -38,6 +41,8 @@ def build_parser():
     p.add_argument("--nuclei", action="store_true", help="nuclei vuln/exposure scan — ACTIVE")
     p.add_argument("--subs", action="store_true", help="subdomain discovery (subfinder)")
     p.add_argument("--full", action="store_true", help="= --ports --nuclei --subs")
+    p.add_argument("--dry-run", action="store_true",
+                   help="estimate network footprint (traffic/packets) and exit — sends nothing")
     p.add_argument("--concurrency", type=int, default=4, help="parallel hosts in list mode (default 4)")
     p.add_argument("--nuclei-timeout", type=int, default=900,
                    help="nuclei wall-clock cap in seconds (default 900)")
@@ -73,6 +78,13 @@ def main(argv=None):
     }
 
     if os.path.isfile(args.target):
+        if args.dry_run:
+            valid, _ = batch.read_hosts(args.target)
+            if not valid:
+                print("No valid hosts in list.", file=sys.stderr)
+                return 2
+            estimate.render(valid[0], opts, n_hosts=len(valid))
+            return 0
         batch.scan_list(args.target, opts, concurrency=args.concurrency)
         return 0
 
@@ -81,6 +93,10 @@ def main(argv=None):
         print(f"Invalid target: {host!r} (not a valid host, and not an existing file).",
               file=sys.stderr)
         return 2
+
+    if args.dry_run:
+        estimate.render(host, opts, n_hosts=1)
+        return 0
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     safe = re.sub(r"[^\w.\-]", "_", host)
