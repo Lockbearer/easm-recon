@@ -5,4 +5,4 @@ nmap, nuclei, subfinder) into a single, consistent workflow that produces a
 readable report plus machine-readable CSVs. Runs on Windows, Linux and macOS.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
